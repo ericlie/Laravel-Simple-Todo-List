@@ -1,0 +1,22 @@
+{
+    "Delete":"Hapus",
+    "Save":"Simpan",
+    "Back":"Kembali",
+    "Edit":"Ubah",
+    "Show":"Lihat",
+    "Login":"Masuk",
+    "Logout":"Keluar",
+    "Register":"Daftar",
+    "Add Task":"Tambah Tugas",
+    "Task" : "Tugas",
+    "Edit Task": "Ubah Tugas",
+    "Create A New Task": "Tambah Sebuah Tugas Baru",
+    "Home": "Rumah",
+    "E-Mail Address": "Alamat E-mail",
+    "Name": "Nama",
+    "Password": "Kata Sandi",
+    "Confirm Password": "Ulangi Kata Sandi",
+    "Remember Me": "Ingat saya",
+    "Forgot Your Password?": "Lupa Kata Sandi Anda?",
+    "No Task": "Belum Ada Tugas"
+}
