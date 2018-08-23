@@ -11,7 +11,7 @@
     <title>{{ config('app.name', 'Laravel') }}</title>
 
     <!-- Scripts -->
-    <script src="{{ asset('js/app.js') }}" defer></script>
+    <script src="{{ asset('js/app.js') }}"></script>
 
     <!-- Fonts -->
     <link rel="dns-prefetch" href="https://fonts.gstatic.com">
@@ -50,7 +50,7 @@
                                 </a>
 
                                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                                    <a class="dropdown-item" href="{{ route('tasks.create') }}">
+                                    <a class="dropdown-item"  data-toggle="modal" data-target="#myModal">
                                         {{ __('Add Task') }}
                                     </a>
                                     <a class="dropdown-item" href="{{ route('logout') }}"
@@ -73,5 +73,62 @@
             @yield('content')
         </main>
     </div>
+    <!-- Modal -->
+    <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title" id="myModalLabel">Create</h4>
+          </div>
+          <div class="modal-body">
+            <form action="{{ route('tasks.store') }}" method="POST" id="createForm">
+                @csrf
+                <div class="form-group">
+                    <label>{{ __('Task') }}</label>
+                    <input type="text" name="task" class="form-control">
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> {{ __('Save') }}</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+        $(function() {
+            const $form = $('#createForm')
+            const { log, error } = console;
+            $form.on('submit', function (ev) {
+                ev.preventDefault()
+                $.ajax({
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    url: $form.attr('action'),
+                    method: 'POST',
+                    dataType: 'JSON',
+                    data: $form.serialize(),
+                    success: function (data) {
+                        let template = `
+                            <tr>
+                                <td># ${data.id} - By ${data.user.name} </td>
+                                <td>${data.task}</td>
+                                <td>Action</td>
+                            </tr>
+                        `
+                        $('#taskTable tbody').append($(template))
+                        log(data)
+                    },
+                    error: function (data) {
+                        let { errors, message } = data.responseJSON
+                        error(errors)
+                        console.log(message);
+                        alert(errors.task[0])
+                    }
+                })
+            })
+        })
+    </script>
+    @stack('js')
 </body>
 </html>

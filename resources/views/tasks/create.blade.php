@@ -14,14 +14,16 @@
                     </span>
                 </div>
                 <div class="card-body">
-                    <form action="{{ route('tasks.store') }}" method="POST">
-                        @csrf
-                        <div class="form-group">
-                            <label>{{ __('Task') }}</label>
-                            <input type="text" name="task" class="form-control">
-                        </div>
+                    {!! Form::model(null, [
+                        'url' => route('tasks.store'),
+                        'method' => 'POST',
+                        'files' => true,
+                    ]) !!}
+                        {!! Form::cInput('name_of_employee') !!}
+                        {!! Form::cInput('email') !!}
+                        {!! Form::cFile('email') !!}
                         <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> {{ __('Save') }}</button>
-                    </form>
+                    {!! Form::close() !!}
                 </div>
             </div>
         </div>

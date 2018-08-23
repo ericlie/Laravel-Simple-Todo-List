@@ -14,7 +14,9 @@
                         </div>
                     @endif
 
-                    <a href="{{ route('tasks.index') }}" class="btn btn-primary">Go to Tasks</a>
+                    <a href="{{ route('tasks.index') }}" class="btn btn-primary">
+                        {{ __('Go to Tasks')}}
+                    </a>
                 </div>
             </div>
         </div>

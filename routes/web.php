@@ -15,10 +15,28 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('debug', function () {
+    // $post = new \App\Post();
+    // $post->title = 'Post from debug';
+    // $post->body = 'lorem ipsum';
+    // $post->user()->associate(\App\User::first());
+    // $post->save();
+
+    // $comment = new \App\Comment();
+    // $comment->body = 'This is great';
+    // $post->comments()->save($comment);
+
+    $post = \App\Post::first()->load('comments', 'user');
+    return dd($post->created_at);
+});
+
 Auth::routes();
+
+Route::get('activate/{token}', 'ActivationController@activate')->name('account.activation');
 
 Route::group(['middleware' => 'auth'], function () {
     // Route::resource('tasks', 'TaskController');
+    Route::get('/tasks/all', 'TaskController@all')->name('tasks.all');
     Route::get('/tasks', 'TaskController@index')->name('tasks.index');
     Route::get('/tasks/create', 'TaskController@create')->name('tasks.create');
     Route::post('/tasks', 'TaskController@store')->name('tasks.store');

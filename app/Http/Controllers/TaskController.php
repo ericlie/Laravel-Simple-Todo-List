@@ -14,9 +14,7 @@ class TaskController extends Controller
      */
     public function index()
     {
-        return view('tasks.index', [
-            'tasks' => Task::with('user')->get(),
-        ]);
+        return view('tasks.index');
     }
 
     /**
@@ -37,10 +35,16 @@ class TaskController extends Controller
      */
     public function store(Request $request)
     {
+        $data = $request->validate([
+            'task' => 'required|string',
+        ]);
         $task = new Task;
         $task->task = $request->input('task');
         $task->user_id = auth()->id(); //\App\User::first()->id; // For simplicity purpose
         $task->save();
+        if ($request->ajax()) {
+            return response()->json($task->load('user'));
+        }
         return redirect()->route('tasks.index');
     }
 
@@ -52,6 +56,7 @@ class TaskController extends Controller
      */
     public function show(Task $task)
     {
+        $this->authorize('view', $task);
         return view('tasks.show', compact('task'));
     }
 
@@ -63,6 +68,7 @@ class TaskController extends Controller
      */
     public function edit(Task $task)
     {
+        $this->authorize('update', $task);
         return view('tasks.edit', compact('task'));
     }
 
@@ -76,7 +82,10 @@ class TaskController extends Controller
     public function update(Request $request, Task $task)
     {
         $this->authorize('update', $task);
-        $task->task = $request->input('task');
+        $data = $request->validate([
+            'task' => 'required|string|max:5',
+        ]);
+        $task->task = $data['task'];
         $task->user_id = auth()->id(); //\App\User::first()->id; // For simplicity purpose
         $task->save();
         return redirect()->route('tasks.index');
@@ -93,5 +102,10 @@ class TaskController extends Controller
         $this->authorize('delete', $task);
         $task->delete();
         return redirect()->route('tasks.index');
+    }
+
+    public function all()
+    {
+        return response()->json(Task::with('user')->latest()->take(5)->get());
     }
 }
