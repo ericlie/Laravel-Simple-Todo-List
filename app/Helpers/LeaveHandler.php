@@ -9,6 +9,13 @@ use Carbon\Carbon;
 
 class LeaveHandler
 {
+    protected $today;
+
+    public function __construct()
+    {
+        $this->today = today();
+    }
+
     private function enum()
     {
         static $enum;
@@ -16,6 +23,12 @@ class LeaveHandler
             $enum = new LeaveTypeEnum;
         }
         return $enum;
+    }
+
+    public function setToday(Carbon $date)
+    {
+        $this->today = $date;
+        return $this;
     }
 
     public function handleRepetition()
@@ -70,11 +83,11 @@ class LeaveHandler
         }
     }
 
-    private function getLatestExpiryDate(EmployeeLeave $empLeave):? Carbon
+    public function getLatestExpiryDate(EmployeeLeave $empLeave):? Carbon
     {
         $effectiveDate = Carbon::parse($empLeave->effective_date);
 
-        if (! $effectiveDate->lte(today())) {
+        if (! $effectiveDate->lte($this->today)) {
             return null;
         }
 
@@ -95,14 +108,14 @@ class LeaveHandler
 
         $expiryDate = Carbon::parse($leave->expiry_date);
 
-        if (! $expiryDate->lte(today())) {
+        if (! $expiryDate->lte($this->today)) {
             return null;
         }
 
         return $expiryDate;
     }
 
-    private function getNextExpiryDate(EmployeeLeave $empLeave)
+    public function getNextExpiryDate(EmployeeLeave $empLeave)
     {
         $date = $this->getLatestExpiryDate($empLeave);
 
@@ -129,7 +142,7 @@ class LeaveHandler
         return null;
     }
 
-    private function shouldStopRecurrence(EmployeeLeave $empLeave): bool
+    public function shouldStopRecurrence(EmployeeLeave $empLeave): bool
     {
         if ($empLeave->ended_type === $this->enum()->pick('ending', 'none')) {
             return false;
@@ -139,18 +152,20 @@ class LeaveHandler
     }
 
 
-    private function getStopValue(EmployeeLeave $empLeave)
+    public function getStopValue(EmployeeLeave $empLeave): ?string
     {
         if ($empLeave->ended_type === $this->enum()->pick('ending', 'specific_date')) {
-            return today()->toDateString();
+            return $this->today->toDateString();
         }
 
         if ($empLeave->ended_type === $this->enum()->pick('ending', 'times')) {
-            return $this->countTotalRepeating($empLeave);
+            return (string) $this->countTotalRepeating($empLeave);
         }
+
+        return null;
     }
 
-    private function countTotalRepeating(EmployeeLeave $empLeave)
+    public function countTotalRepeating(EmployeeLeave $empLeave): int
     {
         return Leave::where('user_id', $empLeave->user_id)
             ->where('leave_type_id', $empLeave->leave_type_id)

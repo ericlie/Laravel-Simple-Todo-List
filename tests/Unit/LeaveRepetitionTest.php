@@ -271,4 +271,93 @@ class LeaveRepetitionTest extends TestCase
         $this->assertDatabaseHas($leave->getTable(), $leaveData);
         $this->assertDatabaseHas($leave->getTable(), $expectedData);
     }
+
+    public function testWhenAfter2Recurrence()
+    {
+        $data = [
+            'repeat_type' => $this->enum()->pick('repeat', 'monthly'),
+            'starting_type' => $this->enum()->pick('starting', 'specific_date'),
+            'awarded_days' => 10,
+            'ended_type' => $this->enum()->pick('ending', 'times'),
+        ];
+        $effectiveDate = today()->subDays(10)->subMonths(3);
+        list($leaveType, $user) = $this->leaveFactory($data);
+        $stopValue = 2;
+        $empLeave = $this->createEmployeeLeave($leaveType, $user, $effectiveDate, $stopValue);
+
+        $leaveData = [
+            'user_id' => $user->id,
+            'leave_type_id' => $leaveType->id,
+            'status' => $this->enum()->pick('status', 'approve'),
+            'add_days' => 10,
+            'less_days' => 0,
+            'expiry_date' => $effectiveDate->copy()->addMonth(),
+            'start_date' => null,
+            'end_date' => null,
+            'total_days' => 0,
+            'total_working_days' => 0,
+            'deductible_salary' => 0,
+        ];
+        $leave = new Leave($leaveData);
+        $leave->save();
+        $secondRecurrence = array_merge($leaveData, ['expiry_date' => $effectiveDate->copy()->addMonths(2)]);
+        $thirdRecurrence = array_merge($leaveData, ['expiry_date' => $effectiveDate->copy()->addMonths(3)]);
+        Leave::create($secondRecurrence);
+
+        $leaveHandler = new LeaveHandler();
+        $leaveHandler->handleRepetition();
+        $total = $leaveHandler->countTotalRepeating($empLeave);
+
+        $this->assertEquals(2, $total);
+        $this->assertDatabaseHas($empLeave->getTable(), [ 'effective_date' => $effectiveDate]);
+        $this->assertDatabaseHas($leaveType->getTable(), $data);
+        $this->assertDatabaseHas($leave->getTable(), $leaveData);
+        $this->assertDatabaseHas($leave->getTable(), $secondRecurrence);
+        $this->assertDatabaseMissing($leave->getTable(), $thirdRecurrence);
+    }
+
+    public function testWhenAfterSpecificDate()
+    {
+        $data = [
+            'repeat_type' => $this->enum()->pick('repeat', 'monthly'),
+            'starting_type' => $this->enum()->pick('starting', 'specific_date'),
+            'awarded_days' => 10,
+            'ended_type' => $this->enum()->pick('ending', 'specific_date'),
+        ];
+        $effectiveDate = today()->subDays(10)->subMonths(3);
+        list($leaveType, $user) = $this->leaveFactory($data);
+        // Depending on the repeat type,
+        // when end type is specific date,
+        // one must specify stop value greater or equal to first occurrence
+        $stopValue = $effectiveDate->copy()->addMonth()->addDays(12);
+        $empLeave = $this->createEmployeeLeave($leaveType, $user, $effectiveDate, $stopValue->toDateString());
+
+        $leaveData = [
+            'user_id' => $user->id,
+            'leave_type_id' => $leaveType->id,
+            'status' => $this->enum()->pick('status', 'approve'),
+            'add_days' => 10,
+            'less_days' => 0,
+            'expiry_date' => $effectiveDate->copy()->addMonth(),
+            'start_date' => null,
+            'end_date' => null,
+            'total_days' => 0,
+            'total_working_days' => 0,
+            'deductible_salary' => 0,
+        ];
+        $leave = new Leave($leaveData);
+        $leave->save();
+        $secondRecurrence = array_merge($leaveData, ['expiry_date' => $effectiveDate->copy()->addMonths(2)]);
+        $empLeave->ended_type = $this->enum()->pick('ending', 'specific_date');
+        $leaveHandler = new LeaveHandler();
+        $leaveHandler->setToday($stopValue);
+        $leaveHandler->handleRepetition();
+        $shouldStop = $leaveHandler->shouldStopRecurrence($empLeave);
+
+        $this->assertTrue($shouldStop);
+        $this->assertDatabaseHas($empLeave->getTable(), [ 'effective_date' => $effectiveDate]);
+        $this->assertDatabaseHas($leaveType->getTable(), $data);
+        $this->assertDatabaseHas($leave->getTable(), $leaveData);
+        $this->assertDatabaseMissing($leave->getTable(), $secondRecurrence);
+    }
 }
