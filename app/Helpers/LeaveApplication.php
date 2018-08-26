@@ -8,6 +8,7 @@ use App\Helpers\LeaveTypeEnum;
 use App\Leave;
 use App\LeaveType;
 use App\User;
+use Carbon\Carbon;
 
 /**
  * Leave Application
@@ -60,20 +61,24 @@ class LeaveApplication
         }
 
         $startDate = $this->startDate->copy();
+        $limitDate = false;
 
         if ($empLeave->limit_type === $this->enum->pick('limit_type', 'times_per_week')) {
             $startDate = $startDate->startOfWeek();
             $endDate = $startDate->copy()->endOfWeek();
+            $limitDate = true;
         }
 
         if ($empLeave->limit_type === $this->enum->pick('limit_type', 'times_per_month')) {
             $startDate = $startDate->startOfMonth();
             $endDate = $startDate->copy()->endOfMonth();
+            $limitDate = true;
         }
 
         if ($empLeave->limit_type === $this->enum->pick('limit_type', 'times_per_quarter')) {
             $startDate = $startDate->firstOfQuarter();
             $endDate = $startDate->copy()->endOfQuarter();
+            $limitDate = true;
         }
 
         if ($empLeave->limit_type === $this->enum->pick('limit_type', 'times_per_semester')) {
@@ -82,13 +87,26 @@ class LeaveApplication
                 $startDate->subQuarter();
             }
             $endDate = $startDate->copy()->addQuarter()->endOfQuarter();
+            $limitDate = true;
+        }
+
+        if ($empLeave->limit_type === $this->enum->pick('limit_type', 'times_per_year')) {
+            $startDate = $startDate->startOfYear();
+            $endDate = $startDate->copy()->endOfYear();
+            $limitDate = true;
+        }
+
+        if ($empLeave->limit_type === $this->enum->pick('limit_type', 'times')) {
+            $limitDate = false;
         }
 
         $leave = Leave::where('user_id', $empLeave->user_id)
             ->where('leave_type_id', $empLeave->leave_type_id)
             ->where('status', $this->enum->pick('status', 'approve'))
-            ->whereDate('start_date', '<=', $endDate)
-            ->whereDate('end_date', '>=', $startDate)
+            ->when($limitDate, function ($query) {
+                return $query->whereDate('start_date', '<=', $endDate)
+                ->whereDate('end_date', '>=', $startDate);
+            })
             ->whereNull('expiry_date')
             ->where('add_days', 0)
             ->count('id');
