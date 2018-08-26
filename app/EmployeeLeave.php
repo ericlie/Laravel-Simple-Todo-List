@@ -36,4 +36,28 @@ class EmployeeLeave extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+
+    public function scopeBuildHandler($query)
+    {
+        return $query->join(
+            'leave_types',
+            'leave_types.id', '=', 'employee_leaves.leave_type_id'
+        )
+        ->select(
+            [
+                'employee_leaves.user_id',
+                'employee_leaves.leave_type_id',
+                'employee_leaves.effective_date',
+                'employee_leaves.stop_value',
+                'leave_types.name','leave_types.has_balance',
+                'leave_types.repeat_type', 'leave_types.repeat_value',
+                'leave_types.starting_type', 'leave_types.awarded_days',
+                'leave_types.ended_type', 'leave_types.can_accumulate',
+                'leave_types.is_compulsory',
+                'leave_types.is_paid_leave', 'leave_types.paid_type',
+                'leave_types.limit', 'leave_types.limit_type',
+                'leave_types.max_days', 'leave_types.max_type',
+            ]
+        );
+    }
 }

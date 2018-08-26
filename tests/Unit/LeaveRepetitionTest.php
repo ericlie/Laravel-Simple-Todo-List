@@ -11,71 +11,13 @@ use App\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
+use Tests\LeaveHelperTrait;
 use Tests\TestCase;
 
 class LeaveRepetitionTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, LeaveHelperTrait;
 
-    private function enum()
-    {
-        static $enum;
-        if (! $enum) {
-            $enum = new LeaveTypeEnum;
-        }
-        return $enum;
-    }
-
-    /**
-     * Creating Leave
-     *
-     * @param array $options
-     *
-     * @return array
-     */
-    private function leaveFactory(array $options = []): array
-    {
-        $attributes = [
-            'name' => 'Some Leave',
-            'has_balance' => false,
-            'repeat_type' => $this->enum()->pick('repeat', 'none'),
-            'starting_type' => $this->enum()->pick('starting', 'none'),
-            'awarded_days' => 10,
-            'ended_type' => $this->enum()->pick('ending', 'none'),
-            'can_accumulate' => false,
-            'is_paid_leave' => false,
-            'paid_type' => $this->enum()->pick('paid_type', 'none'),
-            'limit' => 0,
-            'limit_type' => $this->enum()->pick('limit_type', 'none'),
-            'max_days' => 0,
-            'max_type' => $this->enum()->pick('max_type', 'none'),
-            'is_compulsory' => true,
-        ];
-        $leaveType = new LeaveType(array_merge($attributes, $options));
-        $leaveType->save();
-        $user = factory(User::class)->create();
-
-        return [$leaveType, $user];
-    }
-
-    private function createEmployeeLeave(
-        LeaveType $leaveType,
-        User $user,
-        Carbon $effectiveDate,
-        $stopValue = null
-    ) {
-
-        $attributes = [
-            'effective_date' => $effectiveDate,
-            'stop_value' => $stopValue,
-            'user_id' => $user->id,
-            'leave_type_id' => $leaveType->id,
-        ];
-        $empLeave = new EmployeeLeave($attributes);
-         $empLeave->save();
-
-         return $empLeave;
-    }
 
     public function testWhenCreatingUserAndLeaveType()
     {
@@ -359,5 +301,108 @@ class LeaveRepetitionTest extends TestCase
         $this->assertDatabaseHas($leaveType->getTable(), $data);
         $this->assertDatabaseHas($leave->getTable(), $leaveData);
         $this->assertDatabaseMissing($leave->getTable(), $secondRecurrence);
+    }
+
+    public function testWhenRepeatMonthlyOnExistingRecordAndCanAccumalate()
+    {
+        $data = [
+            'repeat_type' => $this->enum()->pick('repeat', 'monthly'),
+            'starting_type' => $this->enum()->pick('starting', 'specific_date'),
+            'awarded_days' => 10,
+            'can_accumulate' => true,
+        ];
+        $effectiveDate = today()->subDays(10)->subMonths(2);
+        list($leaveType, $user) = $this->leaveFactory($data);
+        $empLeave = $this->createEmployeeLeave($leaveType, $user, $effectiveDate);
+        $leaveData = [
+            'user_id' => $user->id,
+            'leave_type_id' => $leaveType->id,
+            'status' => $this->enum()->pick('status', 'approve'),
+            'add_days' => 10,
+            'less_days' => 0,
+            'expiry_date' => $effectiveDate->copy()->addMonth(),
+            'start_date' => null,
+            'end_date' => null,
+            'total_days' => 0,
+            'total_working_days' => 0,
+            'deductible_salary' => 0,
+        ];
+        $leave = new Leave($leaveData);
+        $leave->save();
+        $this->assertDatabaseHas($leave->getTable(), $leaveData);
+
+        $expectedData = array_merge($leaveData, [
+            'expiry_date' => $effectiveDate->copy()->addMonths(2),
+            'add_days' => 20,
+        ]);
+        $leaveHandler = new LeaveHandler();
+        $leaveHandler->handleRepetition();
+
+        $this->assertDatabaseHas($empLeave->getTable(), [ 'effective_date' => $effectiveDate]);
+        $this->assertDatabaseHas($leaveType->getTable(), $data);
+        $this->assertDatabaseHas($leave->getTable(), $expectedData);
+    }
+
+    public function testWhenRepeatMonthlyOnExistingRecordAndCanAccumalateWithALeaveRecord()
+    {
+        $data = [
+            'repeat_type' => $this->enum()->pick('repeat', 'monthly'),
+            'starting_type' => $this->enum()->pick('starting', 'specific_date'),
+            'awarded_days' => 10,
+            'can_accumulate' => true,
+        ];
+        $effectiveDate = today()->subDays(10)->subMonths(2);
+        list($leaveType, $user) = $this->leaveFactory($data);
+        $empLeave = $this->createEmployeeLeave($leaveType, $user, $effectiveDate);
+        $leaveData = [
+            'user_id' => $user->id,
+            'leave_type_id' => $leaveType->id,
+            'status' => $this->enum()->pick('status', 'approve'),
+            'add_days' => 10,
+            'less_days' => 0,
+            'expiry_date' => $effectiveDate->copy()->addMonth(),
+            'start_date' => null,
+            'end_date' => null,
+            'total_days' => 0,
+            'total_working_days' => 0,
+            'deductible_salary' => 0,
+        ];
+        $leave = new Leave($leaveData);
+        $leave->save();
+
+        $this->assertDatabaseHas($leave->getTable(), $leaveData);
+
+        $leaveStartDate = $effectiveDate->copy()->addMonth()->addDays(8);
+        $leaveEndDate = $leaveStartDate->copy()->addDays(8);
+        $totalWorkingDays = $leaveStartDate->diffInDaysFiltered(
+            function (Carbon $date) {
+                return ! $date->isWeekend();
+            },
+            $leaveEndDate
+        );
+        $applyLeave = array_merge($leaveData, [
+            'expiry_date' => null,
+            'add_days' => 0,
+            'start_date' => $leaveStartDate,
+            'end_date' => $leaveEndDate,
+            'less_days' => 8,
+            'total_days' => $leaveStartDate->diffInDays($leaveEndDate),
+            'total_working_days' => $totalWorkingDays,
+            'deductible_salary' => 0,
+        ]);
+
+        Leave::create($applyLeave);
+        $this->assertDatabaseHas($leave->getTable(), $applyLeave);
+
+        $expectedData = array_merge($leaveData, [
+            'expiry_date' => $effectiveDate->copy()->addMonths(2),
+            'add_days' => (10 + 10 - 8),
+        ]);
+        $leaveHandler = new LeaveHandler();
+        $leaveHandler->handleRepetition();
+
+        $this->assertDatabaseHas($empLeave->getTable(), [ 'effective_date' => $effectiveDate]);
+        $this->assertDatabaseHas($leaveType->getTable(), $data);
+        $this->assertDatabaseHas($leave->getTable(), $expectedData);
     }
 }

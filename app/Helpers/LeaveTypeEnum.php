@@ -56,7 +56,6 @@ class LeaveTypeEnum
             [
                 'specific_date',
                 'times',
-                'period',
             ]
         );
     }
@@ -74,8 +73,8 @@ class LeaveTypeEnum
                 'times',
                 'times_per_week',
                 'times_per_month',
-                'times_per_4month',
-                'times_per_6month',
+                'times_per_quarter',
+                'times_per_semester',
                 'times_per_year',
             ]
         );
@@ -109,6 +108,14 @@ class LeaveTypeEnum
         return array_merge(
             $this->getCommonEnum(),
             [
+                'day_per_leave_per_month',
+                'day_per_leave_per_quarter',
+                'day_per_leave_per_semester',
+                'day_per_leave_per_year',
+                'day_per_month',
+                'day_per_quarter',
+                'day_per_semester',
+                'day_per_year',
             ]
         );
     }
